@@ -1,0 +1,19 @@
+var searchData=
+[
+  ['oncompletecb_0',['OnCompleteCb',['../classottersec_1_1HandshakeServer.html#a416893717e3c91f036808eb1b2edce98',1,'ottersec::HandshakeServer']]],
+  ['operator_3d_1',['operator=',['../classottersec_1_1SecurityContext.html#a95fbf22a3c7473b539a9f64a200298dd',1,'ottersec::SecurityContext::operator=(const SecurityContext)=delete'],['../classottersec_1_1SecurityContext.html#aac10054af2a1e92d2c36df9ff21a603f',1,'ottersec::SecurityContext::operator=(SecurityContext &amp;&amp;other) noexcept']]],
+  ['otterdetection_2',['OtterDetection',['../structOtterDetection.html',1,'']]],
+  ['otterfallevent_3',['OtterFallEvent',['../structOtterFallEvent.html',1,'']]],
+  ['otterframebuffer_4',['OtterFrameBuffer',['../structOtterFrameBuffer.html',1,'']]],
+  ['otterhandshakeconfig_5',['OtterHandshakeConfig',['../structOtterHandshakeConfig.html',1,'']]],
+  ['otterinferenceresult_6',['OtterInferenceResult',['../structOtterInferenceResult.html',1,'']]],
+  ['otterkeypoint_7',['OtterKeypoint',['../structOtterKeypoint.html',1,'']]],
+  ['ottersec_8',['ottersec',['../namespaceottersec.html',1,'']]],
+  ['ottersec_5finit_9',['ottersec_init',['../api_8h.html#a53effe6a86a3c470db8ed9a546c40d09',1,'ottersec_init(const OtterHandshakeConfig *config):&#160;api.cpp'],['../api_8cpp.html#a53effe6a86a3c470db8ed9a546c40d09',1,'ottersec_init(const OtterHandshakeConfig *config):&#160;api.cpp']]],
+  ['ottersec_5fnotify_5ffall_10',['ottersec_notify_fall',['../api_8h.html#ae9b731f082d8bd8c1e01eb02ff512c15',1,'ottersec_notify_fall(const OtterFallEvent *event):&#160;api.cpp'],['../api_8cpp.html#ae9b731f082d8bd8c1e01eb02ff512c15',1,'ottersec_notify_fall(const OtterFallEvent *event):&#160;api.cpp']]],
+  ['ottersec_5fpush_5fframe_11',['ottersec_push_frame',['../api_8h.html#a9b700f02e1ae971f041b934744715f36',1,'ottersec_push_frame(const OtterFrameBuffer *frame):&#160;api.cpp'],['../api_8cpp.html#a9b700f02e1ae971f041b934744715f36',1,'ottersec_push_frame(const OtterFrameBuffer *frame):&#160;api.cpp']]],
+  ['ottersec_5fsend_5ftelemetry_12',['ottersec_send_telemetry',['../api_8h.html#a8e03b2ac020e853b5b1073858461c53a',1,'ottersec_send_telemetry(const OtterInferenceResult *result):&#160;api.cpp'],['../api_8cpp.html#a8e03b2ac020e853b5b1073858461c53a',1,'ottersec_send_telemetry(const OtterInferenceResult *result):&#160;api.cpp']]],
+  ['ottersec_5fstart_5fcontrol_5fserver_13',['ottersec_start_control_server',['../api_8h.html#a48a8b33670b7c0464cb5af595a7a80ed',1,'ottersec_start_control_server(int port):&#160;api.cpp'],['../api_8cpp.html#a48a8b33670b7c0464cb5af595a7a80ed',1,'ottersec_start_control_server(int port):&#160;api.cpp']]],
+  ['ottersec_5fstop_5fcontrol_5fserver_14',['ottersec_stop_control_server',['../api_8h.html#a55619898f328548a15c4e2b852bd6bd7',1,'ottersec_stop_control_server(void):&#160;api.cpp'],['../api_8cpp.html#a55619898f328548a15c4e2b852bd6bd7',1,'ottersec_stop_control_server(void):&#160;api.cpp']]],
+  ['ottersec_5fterminate_15',['ottersec_terminate',['../api_8h.html#ad7cecf757ddb45eb4d68d004b07028c3',1,'ottersec_terminate(void):&#160;api.cpp'],['../api_8cpp.html#ad7cecf757ddb45eb4d68d004b07028c3',1,'ottersec_terminate(void):&#160;api.cpp']]]
+];
