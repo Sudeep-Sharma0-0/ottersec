@@ -1,0 +1,9 @@
+PROJECT_NAME           = "OtterSec"
+PROJECT_BRIEF          = "Secure Edge-to-Server Video Middleware"
+OUTPUT_DIRECTORY       = docs
+INPUT                  = include/ src/
+RECURSIVE              = YES
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+EXTRACT_ALL            = YES
+OPTIMIZE_OUTPUT_FOR_C  = YES
