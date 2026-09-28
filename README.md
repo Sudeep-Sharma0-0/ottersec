@@ -45,7 +45,15 @@ When the edge application detects an event, trigger the handshake. OtterSec hand
 
 ```cpp
 ottersec::OtterFallEvent event;
-session_manager->trigger_fall_event(&event);
+ottersec::ControlServer control_server(8080);
+control_server.start();
+
+bool is_fall = /* Fall Detection Logic */;
+control_server.send_telemetry(frame_counter, is_fall, box.x, box.y);
+
+if (is_fall) {
+    session_manager->trigger_fall_event(&event);
+}
 ```
 
 Once triggered, OtterSec will wait for the Python backend to successfully connect and receive the keys before pushing GStreamer frames to the network.

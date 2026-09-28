@@ -18,14 +18,13 @@ bool GstreamerPipeline::start(const std::string &dest_ip, uint16_t dest_port,
   if (is_playing_)
     return false;
 
-  // Build the Jetson-compatible SRTP pipeline
-  // Change `nvvidconv !
-  // nvv4l2h264enc` to `videoconvert ! x264enc tune=zerolatency`
   std::string pipeline_desc =
-      "appsrc name=mysrc is-live=true format=time ! "
-      "video/x-raw,format=RGB,width=1920,height=1080,framerate=30/1 ! "
-      "videoconvert ! x264enc tune=zerolatency ! "
-      "rtph264pay pt=96 config-interval=1 ! srtpenc name=srtpcrypto ! "
+      "appsrc name=appsrc is-live=true format=time do-timestamp=true ! "
+      "video/x-raw,format=RGB,width=640,height=640,framerate=30/1 ! "
+      "videoconvert ! x264enc tune=zerolatency speed-preset=ultrafast "
+      "key-int-max=30 ! "
+      "rtph264pay pt=96 ssrc=112233 config-interval=1 ! srtpenc "
+      "name=srtpcrypto ! "
       "udpsink host=" +
       dest_ip + " port=" + std::to_string(dest_port);
 
@@ -38,28 +37,33 @@ bool GstreamerPipeline::start(const std::string &dest_ip, uint16_t dest_port,
     return false;
   }
 
-  appsrc_ = gst_bin_get_by_name(GST_BIN(pipeline_), "mysrc");
+  appsrc_ = gst_bin_get_by_name(GST_BIN(pipeline_), "appsrc");
+  if (!appsrc_) {
+    std::cerr << "[OtterSec] FATAL: Could not find appsrc!\n";
+    return false;
+  }
 
   GstElement *srtpenc = gst_bin_get_by_name(GST_BIN(pipeline_), "srtpcrypto");
+  if (srtpenc) {
+    std::vector<uint8_t> crypto_material;
+    crypto_material.insert(crypto_material.end(), srtp_key.begin(),
+                           srtp_key.end());
+    crypto_material.insert(crypto_material.end(), srtp_salt.begin(),
+                           srtp_salt.end());
 
-  std::vector<uint8_t> crypto_material;
-  crypto_material.insert(crypto_material.end(), srtp_key.begin(),
-                         srtp_key.end());
-  crypto_material.insert(crypto_material.end(), srtp_salt.begin(),
-                         srtp_salt.end());
+    GstBuffer *key_buffer = gst_buffer_new_allocate(nullptr, 30, nullptr);
+    gst_buffer_fill(key_buffer, 0, crypto_material.data(), 30);
 
-  GstBuffer *key_buffer = gst_buffer_new_allocate(nullptr, 30, nullptr);
-  gst_buffer_fill(key_buffer, 0, crypto_material.data(), 30);
+    g_object_set(srtpenc, "key", key_buffer, "rtp-cipher", 1, "rtcp-cipher", 1,
+                 nullptr);
 
-  g_object_set(srtpenc, "key", key_buffer, "rtp-cipher", 1, "rtcp-cipher", 1,
-               nullptr);
-
-  gst_buffer_unref(key_buffer);
-  gst_object_unref(srtpenc);
+    gst_buffer_unref(key_buffer);
+    gst_object_unref(srtpenc);
+  }
 
   gst_element_set_state(pipeline_, GST_STATE_PLAYING);
   is_playing_ = true;
-  std::cout << "[OtterSec] GStreamer Pipeline ACTIVE and Encrypted.\n";
+  std::cout << "[OtterSec] GStreamer Pipeline ACTIVE and ENCRYPTED.\n";
 
   return true;
 }

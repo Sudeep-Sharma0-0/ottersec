@@ -1,7 +1,9 @@
 #include "session_manager.hpp"
+#include "control_server.hpp"
 #include <iostream>
 
 namespace ottersec {
+extern std::unique_ptr<ControlServer> g_control_server;
 
 SessionManager::SessionManager(const OtterHandshakeConfig *config) {
   handshake_port_ = config ? config->handshake_port : 8443;
@@ -39,7 +41,11 @@ void SessionManager::on_handshake_complete(bool success,
     std::cout << "[OtterSec] Handshake Success. Securing keys in memory.\n";
     sec_context_.set_keys(key.data(), key.size(), salt.data(), salt.size());
 
-    pipeline_.start("127.0.0.1", 5004, key, salt);
+    std::string target_ip = g_control_server->active_client_ip;
+    if (target_ip.empty())
+      target_ip = "127.0.0.1";
+
+    pipeline_.start(target_ip, 5004, key, salt);
 
     transition_to(State::STREAMING);
   } else {

@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package pose;
+
+message Keypoint {
+  float x = 1;
+  float y = 2;
+  float confidence = 3;
+}
+
+message Detection {
+  int32 track_id = 1;
+  float confidence = 2;
+  float x_min = 3;
+  float y_min = 4;
+  float width = 5;
+  float height = 6;
+  repeated Keypoint keypoints = 7;
+}
+
+message InferenceResult {
+  uint64 timestamp_ms = 1;
+  repeated Detection detections = 2;
+  bool fall_detected = 3;
+}

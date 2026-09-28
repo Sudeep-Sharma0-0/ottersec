@@ -19,22 +19,31 @@ pkg_check_modules(OPENSSL REQUIRED openssl)
 
 find_package(Threads REQUIRED)
 find_package(pybind11 CONFIG QUIET)
+find_package(Protobuf REQUIRED)
+
+set(PROTO_FILE "${CMAKE_CURRENT_SOURCE_DIR}/proto/pose_data.proto")
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${PROTO_FILE})
 
 add_library(ottersec SHARED
     src/api.cpp
     src/core/security_context.cpp
     src/core/session_manager.cpp
     src/core/handshake_server.cpp
+    src/core/control_server.cpp
     src/pipeline/gstreamer_pipeline.cpp
+    ${PROTO_SRCS}
+    ${PROTO_HDRS}
 )
 
 target_include_directories(ottersec PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
+    ${CMAKE_CURRENT_BINARY_DIR}
     ${GST_INCLUDE_DIRS}
     ${GST_APP_INCLUDE_DIRS}
     ${GST_ALLOC_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIRS}
+    ${PROTOBUF_INCLUDE_DIRS}
 )
 
 target_link_libraries(ottersec PRIVATE
@@ -42,6 +51,7 @@ target_link_libraries(ottersec PRIVATE
     ${GST_APP_LIBRARIES}
     ${GST_ALLOC_LIBRARIES}
     ${OPENSSL_LIBRARIES}
+    protobuf::libprotobuf
     Threads::Threads
 )
 
