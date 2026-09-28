@@ -1,3 +1,13 @@
+/**
+ * @file handshake_server.cpp
+ * @brief Implements the TLS Handshake server for secure key exchange.
+ *
+ * The HandshakeServer listens on a dedicated TCP port to authenticate the
+ * Python backend. Once the TLS handshake succeeds, it generates
+ * cryptographically secure random bytes (AES key and salt) for the GStreamer
+ * SRTP pipeline, securely transmits them to the client, and fires a callback to
+ * advance the SessionManager's state.
+ */
 #include "handshake_server.hpp"
 #include <iostream>
 #include <netinet/in.h>
@@ -9,12 +19,25 @@
 
 namespace ottersec {
 
+/**
+ * @brief Constructs a new HandshakeServer object.
+ *
+ * Initializes the TLS context using the provided certificate and private key.
+ *
+ * @param port The TCP port to listen on for TLS connections.
+ * @param cert_path Path to the server's public certificate file (PEM format).
+ * @param key_path Path to the server's private key file (PEM format).
+ */
 HandshakeServer::HandshakeServer(uint16_t port, const std::string &cert_path,
                                  const std::string &key_path)
     : port_(port), cert_path_(cert_path), key_path_(key_path) {
   ssl_ctx_ = create_ssl_context();
 }
 
+/**
+ * @brief Destroys the HandshakeServer, ensuring sockets are closed
+ *        and the OpenSSL context is freed.
+ */
 HandshakeServer::~HandshakeServer() {
   stop();
   if (ssl_ctx_) {
@@ -22,6 +45,12 @@ HandshakeServer::~HandshakeServer() {
   }
 }
 
+/**
+ * @brief Creates and configures the OpenSSL TLS context.
+ *
+ * @return SSL_CTX* Pointer to the configured OpenSSL context, or nullptr
+ *         if context creation or certificate loading fails.
+ */
 SSL_CTX *HandshakeServer::create_ssl_context() {
   const SSL_METHOD *method = TLS_server_method();
   SSL_CTX *ctx = SSL_CTX_new(method);
@@ -39,12 +68,22 @@ SSL_CTX *HandshakeServer::create_ssl_context() {
   return ctx;
 }
 
+/**
+ * @brief Starts the asynchronous TLS listening loop in a detached thread.
+ *
+ * @param callback The function to invoke once the handshake succeeds and
+ *                 keys are generated, or if the server encounters a fatal
+ * error.
+ */
 void HandshakeServer::start(OnCompleteCb callback) {
   on_complete_ = callback;
   running_ = true;
   listener_thread_ = std::thread(&HandshakeServer::listen_loop, this);
 }
 
+/**
+ * @brief Forces the listener thread to shut down and close active sockets.
+ */
 void HandshakeServer::stop() {
   running_ = false;
   if (server_fd_ >= 0) {
@@ -57,6 +96,14 @@ void HandshakeServer::stop() {
   }
 }
 
+/**
+ * @brief The core thread function that handles incoming TLS connections.
+ *
+ * Binds to the specified TCP port and waits for the Python backend. Upon
+ * connection, it performs the TLS handshake. If successful, it uses OpenSSL's
+ * RAND_bytes to generate a 16-byte SRTP key and a 14-byte SRTP salt, transmits
+ * them over the encrypted tunnel, and fires the completion callback.
+ */
 void HandshakeServer::listen_loop() {
   if (!ssl_ctx_) {
     if (on_complete_)
@@ -98,16 +145,20 @@ void HandshakeServer::listen_loop() {
       std::cout
           << "[OtterSec] TLS Connection established. Generating SRTP keys...\n";
 
+      // Allocate precise byte lengths mandated by AES-128-ICM
       std::vector<uint8_t> master_key(16);
       std::vector<uint8_t> master_salt(14);
 
+      // Generate cryptographically secure random numbers
       RAND_bytes(master_key.data(), master_key.size());
       RAND_bytes(master_salt.data(), master_salt.size());
 
+      // Serialize into a flat 30-byte payload for transmission
       std::vector<uint8_t> payload;
       payload.insert(payload.end(), master_key.begin(), master_key.end());
       payload.insert(payload.end(), master_salt.begin(), master_salt.end());
 
+      // Transmit the crypto material over the secure TLS socket
       int bytes_written = SSL_write(ssl, payload.data(), payload.size());
       if (bytes_written <= 0) {
         std::cerr << "[OtterSec] Error: Failed to transmit keys to backend.\n";

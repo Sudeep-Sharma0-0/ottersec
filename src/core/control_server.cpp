@@ -1,5 +1,14 @@
+/**
+ * @file control_server.cpp
+ * @brief Implements the Silent Tripwire and Telemetry TCP server.
+ *
+ * The ControlServer acts as the primary command-and-control channel between
+ * the edge device and the backend. It waits for the Python backend to connect,
+ * dynamically captures the client's IP address (to route the UDP video later),
+ * and streams serialized Protocol Buffer telemetry data (bounding boxes,
+ * keypoints, fall events) over a persistent TCP socket.
+ */
 #include "control_server.hpp"
-#include "telemetry.pb.h"
 
 #include <arpa/inet.h>
 #include <cstring>
@@ -9,11 +18,31 @@
 
 namespace ottersec {
 
+/**
+ * @brief Constructs a new ControlServer.
+ *
+ * @param port The TCP port to listen on for incoming control connections
+ * (default 8080).
+ */
 ControlServer::ControlServer(int port)
     : port_(port), server_fd_(-1), client_fd_(-1), running_(false) {}
 
+/**
+ * @brief Destroys the ControlServer, ensuring all sockets and threads are
+ * safely closed.
+ */
 ControlServer::~ControlServer() { stop(); }
 
+/**
+ * @brief Initializes the TCP socket, binds to the port, and starts the listener
+ * thread.
+ *
+ * Enables SO_REUSEADDR to prevent "Address already in use" errors during rapid
+ * restarts. Spawns an asynchronous thread running `accept_loop`.
+ *
+ * @return true if the socket successfully binds and the listener thread starts.
+ * @return false if socket creation, binding, or listening fails.
+ */
 bool ControlServer::start() {
   server_fd_ = socket(AF_INET, SOCK_STREAM, 0);
   if (server_fd_ < 0) {
@@ -48,6 +77,13 @@ bool ControlServer::start() {
   return true;
 }
 
+/**
+ * @brief Safely shuts down the server.
+ *
+ * Closes the active client connection, shuts down the main listening socket,
+ * and joins the `accept_loop` thread back to the main process to prevent
+ * segmentation faults.
+ */
 void ControlServer::stop() {
   running_ = false;
   if (server_fd_ >= 0) {
@@ -64,6 +100,14 @@ void ControlServer::stop() {
   }
 }
 
+/**
+ * @brief Background thread loop that accepts incoming client connections.
+ *
+ * Upon a successful connection, it extracts the client's IPv4 address using
+ * inet_ntop and stores it in `active_client_ip`. This dynamic discovery is
+ * critical for allowing the SessionManager to know where to shoot the UDP
+ * video.
+ */
 void ControlServer::accept_loop() {
   while (running_) {
     sockaddr_in client_addr{};
@@ -87,12 +131,25 @@ void ControlServer::accept_loop() {
   }
 }
 
+/**
+ * @brief Transmits a length-prefixed raw binary payload to the connected
+ * client.
+ *
+ * Uses a standard network framing protocol: it first sends a 4-byte header
+ * (converted to network byte order via `htonl`) indicating the exact size
+ * of the payload, followed by the payload itself. Uses MSG_NOSIGNAL to
+ * prevent the application from crashing via SIGPIPE if the client disconnects.
+ *
+ * @param data Pointer to the serialized Protobuf byte array.
+ * @param size The total number of bytes in the payload.
+ */
 void ControlServer::send_raw_payload(const uint8_t *data, size_t size) {
   if (client_fd_ < 0 || !data || size == 0)
     return;
 
   std::lock_guard<std::mutex> lock(send_mutex_);
 
+  // Send 4-byte length prefix (Network Byte Order)
   uint32_t net_length = htonl(static_cast<uint32_t>(size));
   if (send(client_fd_, &net_length, sizeof(net_length), MSG_NOSIGNAL) < 0) {
     close(client_fd_);

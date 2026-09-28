@@ -1,23 +1,61 @@
+/**
+ * @file gstreamer_pipeline.cpp
+ * @brief Manages the secure video encoding and transmission pipeline.
+ *
+ * This class handles the initialization of a GStreamer pipeline that takes
+ * raw RGB frames, encodes them via x264, applies SRTP (Secure Real-time
+ * Transport Protocol) encryption using dynamically generated TLS keys,
+ * and streams them over UDP to the connected Python backend.
+ */
 #include "gstreamer_pipeline.hpp"
 #include <cstring>
 #include <iostream>
 
 namespace ottersec {
-
+/**
+ * @brief Constructs a new GstreamerPipeline object.
+ *
+ * Safely initializes the global GStreamer library if it has not been
+ * initialized yet by the host application.
+ */
 GstreamerPipeline::GstreamerPipeline() {
   if (!gst_is_initialized()) {
     gst_init(nullptr, nullptr);
   }
 }
 
+/**
+ * @brief Destroys the pipeline and ensures all GStreamer resources are freed.
+ */
 GstreamerPipeline::~GstreamerPipeline() { stop(); }
 
+/**
+ * @brief Starts the encrypted UDP video stream to the target client.
+ *
+ * Dynamically constructs an x264 encoding pipeline. It enforces a strict
+ * 30-frame keyframe interval and forces timestamp generation to prevent
+ * dropping frames. Finally, it injects the 30-byte cryptographic material into
+ * the `srtpenc` plugin.
+ *
+ * @param dest_ip The dynamically discovered IP address of the listening client.
+ * @param dest_port The UDP port to stream to (typically 5004).
+ * @param srtp_key A 16-byte cryptographic key generated during the TLS
+ * handshake.
+ * @param srtp_salt A 14-byte cryptographic salt generated during the TLS
+ * handshake.
+ * @return true if the pipeline was successfully constructed and set to PLAYING.
+ * @return false if the pipeline is already running, or if element creation
+ * fails.
+ */
 bool GstreamerPipeline::start(const std::string &dest_ip, uint16_t dest_port,
                               const std::vector<uint8_t> &srtp_key,
                               const std::vector<uint8_t> &srtp_salt) {
   if (is_playing_)
     return false;
 
+  // Build the secure, zero-latency H.264 UDP pipeline.
+  // Note: ssrc=112233 is hardcoded to perfectly match the decrypter's
+  // expectations.
   std::string pipeline_desc =
       "appsrc name=appsrc is-live=true format=time do-timestamp=true ! "
       "video/x-raw,format=RGB,width=640,height=640,framerate=30/1 ! "
@@ -68,6 +106,15 @@ bool GstreamerPipeline::start(const std::string &dest_ip, uint16_t dest_port,
   return true;
 }
 
+/**
+ * @brief Ingests a raw RGB frame, wraps it in a GstBuffer, and pushes it to the
+ * pipeline.
+ *
+ * @param frame A pointer to the OtterFrameBuffer struct containing the raw
+ * image data and hardware presentation timestamp (PTS).
+ * @return true if the buffer was successfully pushed into the appsrc element.
+ * @return false if the pipeline is stopped, appsrc is missing, or push fails.
+ */
 bool GstreamerPipeline::push_frame(const OtterFrameBuffer *frame) {
   if (!is_playing_ || !appsrc_ || !frame)
     return false;
@@ -91,6 +138,10 @@ bool GstreamerPipeline::push_frame(const OtterFrameBuffer *frame) {
   return (ret == GST_FLOW_OK);
 }
 
+/**
+ * @brief Safely shuts down the pipeline, sends the End-Of-Stream (EOS) event,
+ *        and unreferences all GStreamer objects to prevent memory leaks.
+ */
 void GstreamerPipeline::stop() {
   if (pipeline_) {
     gst_element_send_event(pipeline_, gst_event_new_eos());
