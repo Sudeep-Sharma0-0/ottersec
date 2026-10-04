@@ -10,6 +10,7 @@
 #include "gstreamer_pipeline.hpp"
 #include <cstring>
 #include <iostream>
+#include <openssl/crypto.h>
 
 namespace ottersec {
 /**
@@ -59,9 +60,11 @@ bool GstreamerPipeline::start(const std::string &dest_ip, uint16_t dest_port,
   std::string pipeline_desc =
       "appsrc name=appsrc is-live=true format=time do-timestamp=true ! "
       "video/x-raw,format=RGB,width=640,height=640,framerate=30/1 ! "
-      "videoconvert ! x264enc tune=zerolatency speed-preset=ultrafast "
-      "key-int-max=30 ! "
-      "rtph264pay pt=96 ssrc=112233 config-interval=1 ! srtpenc "
+      "videoconvert ! video/x-raw,format=I420 ! "
+      "x264enc bitrate=2048 tune=zerolatency speed-preset=ultrafast "
+      "key-int-max=30 bframes=0 ! "
+      "video/x-h264,profile=baseline ! "
+      "rtph264pay mtu=1400 pt=96 ssrc=112233 config-interval=1 ! srtpenc "
       "name=srtpcrypto ! "
       "udpsink host=" +
       dest_ip + " port=" + std::to_string(dest_port);
@@ -97,6 +100,8 @@ bool GstreamerPipeline::start(const std::string &dest_ip, uint16_t dest_port,
 
     gst_buffer_unref(key_buffer);
     gst_object_unref(srtpenc);
+
+    OPENSSL_cleanse(crypto_material.data(), crypto_material.size());
   }
 
   gst_element_set_state(pipeline_, GST_STATE_PLAYING);
@@ -116,25 +121,18 @@ bool GstreamerPipeline::start(const std::string &dest_ip, uint16_t dest_port,
  * @return false if the pipeline is stopped, appsrc is missing, or push fails.
  */
 bool GstreamerPipeline::push_frame(const OtterFrameBuffer *frame) {
-  if (!is_playing_ || !appsrc_ || !frame)
+  if (!is_playing_ || !appsrc_ || !frame || !frame->surface_ptr)
     return false;
 
   size_t buffer_size = frame->width * frame->height * 3;
-
   GstBuffer *gst_buf = gst_buffer_new_allocate(nullptr, buffer_size, nullptr);
+  gst_buffer_fill(gst_buf, 0, frame->surface_ptr, buffer_size);
 
-  if (frame->surface_ptr) {
-    gst_buffer_fill(gst_buf, 0, frame->surface_ptr, buffer_size);
-  } else {
-    gst_buffer_memset(gst_buf, 0, 0x00FF00, buffer_size);
-  }
-
-  GST_BUFFER_PTS(gst_buf) = frame->pts;
+  GST_BUFFER_PTS(gst_buf) = GST_CLOCK_TIME_NONE;
 
   GstFlowReturn ret;
   g_signal_emit_by_name(appsrc_, "push-buffer", gst_buf, &ret);
   gst_buffer_unref(gst_buf);
-
   return (ret == GST_FLOW_OK);
 }
 

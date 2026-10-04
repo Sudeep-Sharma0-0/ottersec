@@ -10,14 +10,20 @@
 #include "core/control_server.hpp"
 #include "core/session_manager.hpp"
 #include "pose_data.pb.h"
+#include <csignal>
+#include <iostream>
 #include <memory>
 #include <mutex>
+#include <string>
 
 /** Global active session manager for handling TLS and video streaming. */
 static std::unique_ptr<ottersec::SessionManager> g_session = nullptr;
 
 /** Global mutex ensuring thread-safe access across the C-API boundary. */
 static std::mutex g_api_mutex;
+
+static std::string g_cert_path = "server.crt";
+static std::string g_key_path = "server.key";
 
 namespace ottersec {
 /** Global control server for handling the silent tripwire and dynamic IP
@@ -38,6 +44,16 @@ int ottersec_init(const OtterHandshakeConfig *config) {
   std::lock_guard<std::mutex> lock(g_api_mutex);
   if (g_session)
     return -1;
+
+  signal(SIGPIPE, SIG_IGN);
+
+  if (config) {
+    if (config->cert_path)
+      g_cert_path = config->cert_path;
+    if (config->key_path)
+      g_key_path = config->key_path;
+  }
+
   g_session = std::make_unique<ottersec::SessionManager>(config);
   return 0;
 }
@@ -92,7 +108,7 @@ void ottersec_terminate(void) {
 }
 
 /**
- * @brief Starts the silent tripwire TCP server for client discovery and
+ * @brief Starts the secure TLS tripwire TCP server for client discovery and
  * telemetry.
  *
  * @param port The TCP port to listen on (default 8080).
@@ -104,7 +120,15 @@ int ottersec_start_control_server(int port) {
   if (ottersec::g_control_server)
     return -1;
 
-  ottersec::g_control_server = std::make_unique<ottersec::ControlServer>(port);
+  if (g_cert_path.empty() || g_key_path.empty()) {
+    std::cerr << "[OtterSec] Error: Certificates missing. Did you call "
+                 "ottersec_init first?\n";
+    return -1;
+  }
+
+  ottersec::g_control_server =
+      std::make_unique<ottersec::ControlServer>(port, g_cert_path, g_key_path);
+
   return ottersec::g_control_server->start() ? 0 : -1;
 }
 
@@ -166,5 +190,21 @@ void ottersec_stop_control_server(void) {
     ottersec::g_control_server->stop();
     ottersec::g_control_server.reset();
   }
+}
+
+/**
+ * @brief Checks if a remote resolve command was received and resets the
+ * internal flag.
+ *
+ * @return 1 if the remote resolve command was received, 0 otherwise.
+ */
+int ottersec_check_remote_resolve(void) {
+  std::lock_guard<std::mutex> lock(g_api_mutex);
+  if (ottersec::g_control_server &&
+      ottersec::g_control_server->remote_resolve_triggered) {
+    ottersec::g_control_server->remote_resolve_triggered = false;
+    return 1;
+  }
+  return 0;
 }
 }

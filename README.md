@@ -2,27 +2,28 @@
 
 # 🦦 OtterSec
 
-OtterSec is a C++ low-latency, secure video streaming and telemetry middleware designed for edge computing and embedded hardware (e.g., Raspberry Pi 5 with Hailo AI accelerators). It bridges edge AI inference pipelines with external monitoring systems by providing out-of-band TLS key exchange and AES-128-ICM encrypted SRTP video streaming over UDP.
+[한국어 README (Korean)](./README_KR.md)
+
+OtterSec is a high-performance, low-latency, secure video streaming and telemetry middleware written in C++ for edge computing devices and embedded accelerators (e.g., Raspberry Pi 5 with Hailo AI NPU modules). It bridges edge AI inference pipelines with remote monitoring systems by providing out-of-band TLS key distribution and real-time AES-128-ICM encrypted SRTP video streaming over UDP.
 
 ---
 
 ## Architecture Overview
 
-OtterSec uses a two-phase architecture to isolate silent telemetry monitoring from high-bandwidth video transmission:
+OtterSec uses a two-phase state-machine architecture to isolate silent telemetry monitoring from high-bandwidth video transmission:
 
-
-1. **Silent Tripwire Mode (TCP 8080):** The edge device runs a persistent TCP control server. It streams serialized Protocol Buffer (`pose_data.proto`) telemetry containing bounding boxes, skeletal keypoints, and inference flags. The backend stays connected silently without requesting video feed until an emergency flag (`fall_detected`) is asserted.
-2. **Out-of-Band TLS Handshake (TCP 8443):** Upon an emergency trigger, OtterSec opens an OpenSSL TLS 1.3 server on port 8443. The backend client connects over TLS, and OtterSec generates 30 cryptographically secure pseudo-random bytes (16-byte AES Master Key + 14-byte Master Salt) via `RAND_bytes()`, transmitting them over the TLS tunnel.
-3. **Encrypted SRTP Streaming (UDP 5004):** The TLS socket closes immediately after key transmission. OtterSec activates a hardware-accelerated GStreamer pipeline (`appsrc ! x264enc ! srtpenc ! udpsink`) to stream H.264 video encrypted with SRTP (`aes-128-icm`). Packets are tagged with a fixed Synchronization Source (`ssrc=112233`).
-4. **Dynamic Decryption:** The backend receiver uses the 30-byte key received over TLS to configure an `srtpdec` pipeline in real time, decrypting the UDP stream on the fly.
+1. **Silent Tripwire Mode (TLS/TCP Port 8080):** The edge device runs a background control server. It streams serialized Protocol Buffer (`pose_data.proto`) telemetry containing bounding boxes, skeletal keypoints, and inference flags. The backend stays connected silently without requesting a video feed until an emergency flag (`fall_detected`) is asserted.
+2. **Out-of-Band TLS Handshake (TCP Port 8443):** Upon an emergency trigger, OtterSec opens an OpenSSL TLS server on port 8443. The backend client connects over TLS, and OtterSec generates 30 cryptographically secure pseudo-random bytes (16-byte AES Master Key + 14-byte Master Salt) via `RAND_bytes()`, transmitting them across the TLS tunnel.
+3. **Encrypted SRTP Streaming (UDP Port 5004):** The TLS socket closes immediately after key transmission. OtterSec activates a hardware-accelerated GStreamer pipeline (`appsrc ! videoconvert ! x264enc ! srtpenc ! udpsink`) to stream H.264 video encrypted with SRTP (`aes-128-icm`). Packets are constrained to `baseline` profile, zero B-frames (`bframes=0`), and tagged with a fixed Synchronization Source (`ssrc=112233`).
+4. **Emergency Beacon & Remote Re-Arming:** During an active incident, OtterSec pulses emergency telemetry to ensure late-joining or restarted backend instances instantly pick up the alert. An operator can push an `OTTER_RESOLVE_CMD` over TLS to tear down the video pipeline, clear key materials from RAM, and re-arm the tripwire.
 
 ---
 
 ## Key Features
 
-- **Zero-Trust Key Distribution:** No static cryptographic keys stored on disk or hardcoded in binaries. Keys are generated dynamically per session using OpenSSL PRNG.
-- **Memory Scrubbing:** Cryptographic buffers in C++ use `OPENSSL_cleanse()` upon session tear-down to erase key material from RAM.
-- **Hardware-Optimized Video Pipeline:** Native integration with GStreamer `appsrc`, configured with zerolatency H.264 encoding options (`key-int-max=30`, `do-timestamp=true`).
+- **Zero-Trust Key Distribution:** No static cryptographic keys are stored on disk or hardcoded in binaries. Keys are generated dynamically per incident using OpenSSL PRNG.
+- **Memory Scrubbing:** Cryptographic buffers in C++ use `OPENSSL_cleanse()` upon session teardown to erase key material from RAM.
+- **Hardware-Optimized Video Pipeline:** Native integration with GStreamer `appsrc`, configured with web-compliant, zero-latency H.264 parameters (`key-int-max=30`, `bframes=0`, `profile=baseline`, `mtu=1400`, `bitrate=2048`).
 - **Resilient Transport:** Built-in `rtpjitterbuffer` integration and explicit `SSRC` binding to prevent packet ordering issues and clock drift synchronization drops over wireless links.
 - **Multi-Language Extensions:** Pure C-API boundary (`extern "C"`), Python bindings via `pybind11`, and Node.js interoperability.
 
@@ -57,27 +58,42 @@ ottersec/
     └── pipeline/
         ├── gstreamer_pipeline.cpp
         └── gstreamer_pipeline.hpp
+
 ```
+
 ---
 
-## Prerequisites and Installation
+## Environment Setup & Installation
 
-### Dependencies
+### 1. Edge Device Setup (C++ / Linux / Fedora / Raspberry Pi OS)
 
-#### Edge Device (Linux / Raspberry Pi OS / Fedora)
-- C++17 Compiler (GCC or Clang)
-- CMake (>= 3.10)
-- OpenSSL Development Files (`libssl-dev` or `openssl-devel`)
-- GStreamer 1.0 Library & Core Plugins (`libgstreamer1.0-dev`, `gstreamer1-plugins-base-devel`, `gstreamer1-plugins-bad-free-devel`)
-- Protocol Buffers Compiler & C++ Runtime (`protobuf-compiler`, `libprotobuf-dev`)
-- pybind11 (`pybind11-dev` / `python3-pybind11`)
+#### Install System Dependencies
 
-#### Backend Client (Linux / Fedora / macOS)
-- GStreamer 1.0 CLI Tools & H.264 plugins (`gstreamer1-plugins-ugly`, `gstreamer1-libav`)
-- Python 3.8+ or Node.js 18+
+Install compiler toolchains, OpenSSL, GStreamer development libraries, and Protobuf compilers.
 
-### Certificate Generation
-Generate self-signed development certificates for TLS negotiation:
+**On Fedora / RHEL:**
+
+```bash
+sudo dnf groupinstall -y "Development Tools" "C Development Tools and Libraries"
+sudo dnf install -y cmake openssl-devel \
+    gstreamer1-devel gstreamer1-plugins-base-devel gstreamer1-plugins-bad-free-devel \
+    protobuf-compiler protobuf-devel pybind11-devel
+
+```
+
+**On Debian / Ubuntu / Raspberry Pi OS:**
+
+```bash
+sudo apt-get update
+sudo apt-get install -y build-essential cmake libssl-dev \
+    libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev \
+    protobuf-compiler libprotobuf-dev pybind11-dev
+
+```
+
+#### Generate Development TLS Certificates
+
+Generate self-signed development certificates for out-of-band TLS negotiation:
 
 ```bash
 mkdir -p certs
@@ -85,373 +101,209 @@ openssl req -x509 -newkey rsa:4096 \
   -keyout certs/server.key \
   -out certs/server.crt \
   -days 365 -nodes \
-  -subj "/CN=192.168.1.111"
+  -subj "/CN=127.0.0.1"
 
 ```
 
-### Build Instructions
+#### Compile and Install `libottersec`
 
 ```bash
-# Clone and enter directory
+# Clone repository
+git clone https://github.com/Sudeep-Sharma0-0/ottersec.git
 cd ottersec
 
-# Build C++ Shared Library and Python Extensions
+# Build C++ Shared Library and Python Extension
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
 
-# Install shared libraries globally (Optional)
+# Install shared library and headers system-wide
 sudo make install
+sudo ldconfig
 
 ```
 
----
-
-## Usage Guide
-
-### 1. Edge Device Integration (C++)
-
-Integrate `libottersec` directly into your inference pipeline loop.
-
+#### Example Code Structure
 ```cpp
 #include <ottersec/api.h>
-#include <opencv2/opencv.hpp>
-#include <vector>
 #include <iostream>
 
 int main() {
-    // 1. Configure TLS Handshake parameters
-    OtterHandshakeConfig config = {0};
-    config.handshake_port = 8443;
-    config.auth_timeout_ms = 5000;
-    config.cert_path = "certs/server.crt";
-    config.key_path = "certs/server.key";
+    // 1. Configure and Initialize OtterSec
+    OtterHandshakeConfig config = {8443, 5000, "certs/server.crt", "certs/server.key"};
+    ottersec_init(&config);
+    ottersec_start_control_server(8080); // Start Silent Tripwire
 
-    // 2. Initialize OtterSec Session and Control Server
-    if (ottersec_init(&config) != 0) {
-        std::cerr << "Failed to initialize OtterSec session.\n";
-        return -1;
-    }
+    std::cout << "[Edge] System Armed. Monitoring...\n";
 
-    if (ottersec_start_control_server(8080) != 0) {
-        std::cerr << "Failed to start Control Server on port 8080.\n";
-        return -1;
-    }
-
-    // 3. Processing Loop
-    cv::Mat frame = cv::Mat::zeros(640, 640, CV_8UC3); // Example RGB frame
-    bool running = true;
-
-    while (running) {
-        // Push raw video frame to GStreamer pipeline
-        OtterFrameBuffer fb = {0};
-        fb.width = frame.cols;
-        fb.height = frame.rows;
-        fb.surface_ptr = frame.data;
-        fb.pts = 0; // Hardware timestamp
-        
+    while (true) {
+        // 2. Push raw frames to the GStreamer pipeline buffer
+        OtterFrameBuffer fb = {640, 640, my_rgb_frame_ptr, 0};
         ottersec_push_frame(&fb);
 
-        // Fall Detection Logic Event
-        bool fall_detected = true; // Replace with actual fall detection code
-        if (fall_detected) {
-            // Send Protobuf Telemetry over TCP 8080
-            OtterInferenceResult telemetry = {0};
-            telemetry.timestamp_ms = 1000200;
-            telemetry.fall_detected = 1;
-            ottersec_send_telemetry(&telemetry);
+        // 3. Trigger Emergency Secure Stream on Detection
+        if (check_if_fall_detected()) {
+            std::cout << "[Edge] Fall Detected! Initiating Secure Video Stream...\n";
+            OtterFallEvent evt = {1, 0.95f}; // confidence = 0.95
+            ottersec_notify_fall(&evt); 
+        }
 
-            // Trigger Emergency Handshake Sequence
-            OtterFallEvent fall_evt = {0};
-            fall_evt.fall_detected = 1;
-            fall_evt.confidence = 0.95f;
-            ottersec_notify_fall(&fall_evt);
-            
-            break;
+        // 4. Remote Re-arm via Dashboard
+        if (ottersec_check_remote_resolve()) {
+            std::cout << "[Edge] Incident Resolved remotely. Re-arming...\n";
+            ottersec_terminate();
+            ottersec_init(&config);
+            ottersec_start_control_server(8080);
         }
     }
-
-    // 4. Cleanup
-    ottersec_stop_control_server();
-    ottersec_terminate();
     return 0;
 }
-
 ```
 
 ---
 
-### 2. Backend Server Integration (Python)
+### 2. Python Backend Setup
 
-The Python backend connects to TCP 8080, parses incoming Protobuf telemetry, and upon fall detection, executes a TLS handshake on TCP 8443 to pull the SRTP key and launch GStreamer.
+The Python backend connects to TCP 8080, parses incoming Protobuf telemetry, executes a TLS handshake on TCP 8443 upon fall detection, and launches GStreamer to play the decrypted SRTP stream.
 
-```python
-import socket
-import struct
-import binascii
-import ssl
-import subprocess
-import time
-import pose_data_pb2
-
-EDGE_IP = '192.168.1.111'
-CONTROL_PORT = 8080
-TLS_PORT = 8443
-VIDEO_PORT = 5004
-
-def recvall(sock, count):
-    buf = bytearray()
-    while len(buf) < count:
-        newbuf = sock.recv(count - len(buf))
-        if not newbuf:
-            return None
-        buf.extend(newbuf)
-    return buf
-
-def wait_for_fall_alert():
-    print(f"[Backend] Waiting for EdgeStreamer on {EDGE_IP}:{CONTROL_PORT}...")
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-    while True:
-        try:
-            sock.connect((EDGE_IP, CONTROL_PORT))
-            break
-        except ConnectionRefusedError:
-            time.sleep(1)
-
-    print("[Backend] Connected! Listening in SILENT TRIPWIRE mode...")
-
-    try:
-        while True:
-            header = recvall(sock, 4)
-            if not header:
-                print("[Backend] Error: Connection closed by EdgeStreamer.")
-                break
-
-            msg_len = struct.unpack('>I', header)[0]
-            payload = recvall(sock, msg_len)
-            if not payload:
-                break
-
-            msg = pose_data_pb2.InferenceResult()
-            msg.ParseFromString(payload)
-
-            print(f"[Backend] Telemetry Parsed -> Fall Detected: {msg.fall_detected}, Persons: {len(msg.detections)}")
-
-            if msg.fall_detected:
-                print("\n[Backend] 🚨 CRITICAL ALERT: FALL DETECTED 🚨")
-                sock.close()
-                return True
-
-    except Exception as e:
-        print(f"\n[Backend] Stream Error: {e}")
-
-    sock.close()
-    return False
-
-def fetch_tls_keys_and_play():
-    print(f"\n[Backend] Connecting to TLS Port {TLS_PORT}...")
-
-    context = ssl.create_default_context()
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
-
-    raw_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-    try:
-        time.sleep(0.2)
-        secure_sock = context.wrap_socket(raw_socket, server_hostname=EDGE_IP)
-        secure_sock.connect((EDGE_IP, TLS_PORT))
-        print("[Backend] ✅ TLS Handshake Successful!")
-
-        crypto_bytes = recvall(secure_sock, 30)
-        if not crypto_bytes or len(crypto_bytes) != 30:
-            print("[Backend] ❌ Failed to receive 30-byte encryption key!")
-            return
-
-        hex_key = binascii.hexlify(crypto_bytes).decode('utf-8')
-        print(f"[Backend] 🔐 Key Received (Hex): {hex_key[:10]}...{hex_key[-10:]}")
-
-        start_video_player(hex_key)
-
-    except Exception as e:
-        print(f"[Backend] ❌ TLS Handshake Failed: {e}")
-    finally:
-        secure_sock.close()
-
-def start_video_player(hex_key):
-    print(f"[Backend] 🎥 Launching ENCRYPTED Video Feed on UDP {VIDEO_PORT}...")
-
-    srtp_caps = (
-        f"application/x-srtp,payload=(int)96,ssrc=(uint)112233,srtp-cipher=(string)aes-128-icm,"
-        f"srtp-auth=(string)hmac-sha1-80,srtcp-cipher=(string)aes-128-icm,"
-        f"srtcp-auth=(string)hmac-sha1-80,srtp-key=(buffer){hex_key}"
-    )
-
-    gst_command = [
-        "gst-launch-1.0", "--gst-debug-level=3", "-v",
-        "udpsrc", f"port={VIDEO_PORT}",
-        "!", srtp_caps,
-        "!", "srtpdec",
-        "!", "rtpjitterbuffer",
-        "!", "rtph264depay",
-        "!", "h264parse",
-        "!", "avdec_h264",
-        "!", "videoconvert",
-        "!", "autovideosink", "sync=false"
-    ]
-
-    try:
-        subprocess.run(gst_command)
-    except FileNotFoundError:
-        print("\n[ERROR] 'gst-launch-1.0' not found.")
-
-if __name__ == "__main__":
-    print("=== OtterSec Production Backend (Python) ===")
-    if wait_for_fall_alert():
-        fetch_tls_keys_and_play()
-    print("\n[Backend] Session Ended.")
-
-```
-
----
-
-### 3. Backend Server Integration (Node.js)
-
-Node.js asynchronous implementation using native `net`, `tls`, `child_process`, and `protobufjs`.
-
-#### Prerequisites for Node.js
+#### Install Python Dependencies & Generate Protobuf Stubs
 
 ```bash
-npm install protobufjs
+# Create a virtual environment (optional)
+python3 -m venv venv
+source venv/bin/activate
+
+# Install requirements
+pip install protobuf
+
+# Compile the Protocol Buffer definition for Python
+protoc -I=proto --python_out=. proto/pose_data.proto
 
 ```
 
-#### Node.js Code (`backend.js`)
+#### Example Python Backend Code
+```python
+import socket
+import ssl
+import subprocess
 
-```javascript
+EDGE_IP = '192.168.1.111'
+
+# 1. Connect to Silent Tripwire
+print("[Backend] Connecting to Tripwire...")
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.connect((EDGE_IP, 8080))
+
+# Wait for telemetry packet indicating a fall
+data = sock.recv(1024) 
+print("[Backend] 🚨 ALERT RECEIVED! Fetching keys...")
+sock.close()
+
+# 2. Connect via TLS to fetch AES Key
+context = ssl.create_default_context()
+context.check_hostname = False
+context.verify_mode = ssl.CERT_NONE
+
+with socket.create_connection((EDGE_IP, 8443)) as raw_sock:
+    with context.wrap_socket(raw_sock, server_hostname=EDGE_IP) as secure_sock:
+        crypto_bytes = secure_sock.recv(30)
+        hex_key = crypto_bytes.hex()
+        print(f"[Backend] 🔐 Key Received: {hex_key}")
+
+# 3. Launch GStreamer to decrypt video
+srtp_caps = f"application/x-srtp,payload=(int)96,ssrc=(uint)112233,srtp-cipher=(string)aes-128-icm,srtp-auth=(string)hmac-sha1-80,srtcp-cipher=(string)aes-128-icm,srtcp-auth=(string)hmac-sha1-80,srtp-key=(buffer){hex_key}"
+
+subprocess.run([
+    "gst-launch-1.0", "udpsrc", "port=5004",
+    "!", srtp_caps, "!", "srtpdec",
+    "!", "rtph264depay", "!", "h264parse", "!", "avdec_h264", "!", "autovideosink"
+])
+```
+
+#### Run the Python Backend
+
+```bash
+python3 backend.py
+
+```
+
+---
+
+### 3. Node.js Backend & Dashboard Setup
+
+The Node.js backend handles TLS handshakes, Protobuf telemetry decoding, headless SRTP video decryption via GStreamer, and real-time WebSocket broadcasting to an HTML5 dashboard (`JMuxer`).
+
+#### Install Node.js Dependencies
+
+```bash
+# Initialize Node project and install dependencies
+npm install express ws protobufjs
+
+```
+
+#### Directory Setup
+
+Ensure your project contains the compiled `pose_data.proto` file and an HTML5 frontend:
+
+```text
+project-root/
+├── server.js
+├── pose_data.proto
+└── public/
+    └── index.html
+
+```
+
+##### server.js
+```js
 const net = require('net');
 const tls = require('tls');
 const { spawn } = require('child_process');
-const protobuf = require('protobufjs');
 
 const EDGE_IP = '192.168.1.111';
-const CONTROL_PORT = 8080;
-const TLS_PORT = 8443;
-const VIDEO_PORT = 5004;
 
-async function startBackend() {
-    console.log("=== OtterSec Production Backend (Node.js) ===");
+// 1. Connect to Silent Tripwire
+const client = new net.Socket();
+client.connect(8080, EDGE_IP, () => {
+    console.log('[Backend] Connected to Tripwire. Waiting for events...');
+});
+
+client.on('data', (data) => {
+    // (In production, decode Protobuf here)
+    console.log('[Backend] 🚨 ALERT RECEIVED! Fetching secure video keys...');
+    client.destroy();
     
-    // Load Protobuf Definition
-    const root = await protobuf.load('proto/pose_data.proto');
-    const InferenceResult = root.lookupType('pose.InferenceResult');
-
-    console.log(`[Backend JS] Waiting for EdgeStreamer on ${EDGE_IP}:${CONTROL_PORT}...`);
-
-    const client = new net.Socket();
-
-    const connectTripwire = () => {
-        client.connect(CONTROL_PORT, EDGE_IP, () => {
-            console.log('[Backend JS] Connected! Listening in SILENT TRIPWIRE mode...');
-        });
-    };
-
-    connectTripwire();
-
-    let buffer = Buffer.alloc(0);
-
-    client.on('data', (chunk) => {
-        buffer = Buffer.concat([buffer, chunk]);
-
-        // Process 4-byte length-prefixed frames
-        while (buffer.length >= 4) {
-            const msgLen = buffer.readUInt32BE(0);
-            if (buffer.length < 4 + msgLen) {
-                break; // Wait for complete payload
-            }
-
-            const payload = buffer.subarray(4, 4 + msgLen);
-            buffer = buffer.subarray(4 + msgLen);
-
-            const msg = InferenceResult.decode(payload);
-            console.log(`[Backend JS] Telemetry Parsed -> Fall Detected: ${msg.fallDetected}, Persons: ${msg.detections ? msg.detections.length : 0}`);
-
-            if (msg.fallDetected) {
-                console.log('\n[Backend JS] 🚨 CRITICAL ALERT: FALL DETECTED 🚨');
-                client.destroy(); // Close tripwire connection
-                fetchTlsKeysAndPlay();
-                break;
-            }
-        }
+    // 2. Connect via TLS to fetch AES SRTP Key
+    const secureSocket = tls.connect({ host: EDGE_IP, port: 8443, rejectUnauthorized: false }, () => {
+        console.log('[Backend] TLS Secured.');
     });
 
-    client.on('error', (err) => {
-        console.log(`[Backend JS] Connection error: ${err.message}. Retrying in 1s...`);
-        setTimeout(connectTripwire, 1000);
+    secureSocket.on('data', (cryptoBytes) => {
+        const hexKey = cryptoBytes.toString('hex');
+        console.log(`[Backend] 🔐 Key Received: ${hexKey}`);
+        secureSocket.end();
+        
+        // 3. Launch GStreamer to Decrypt UDP 5004 Video Stream
+        const srtpCaps = `application/x-srtp,payload=(int)96,ssrc=(uint)112233,srtp-cipher=(string)aes-128-icm,srtp-auth=(string)hmac-sha1-80,srtcp-cipher=(string)aes-128-icm,srtcp-auth=(string)hmac-sha1-80,srtp-key=(buffer)${hexKey}`;
+        
+        spawn('gst-launch-1.0', [
+            'udpsrc', 'port=5004', 
+            '!', srtpCaps, 
+            '!', 'srtpdec', 
+            '!', 'rtph264depay', '!', 'h264parse', '!', 'avdec_h264', '!', 'autovideosink'
+        ], { stdio: 'inherit' });
     });
-}
+});
+```
 
-function fetchTlsKeysAndPlay() {
-    console.log(`\n[Backend JS] Connecting to TLS Port ${TLS_PORT}...`);
+#### Run the Node.js Server
 
-    const options = {
-        host: EDGE_IP,
-        port: TLS_PORT,
-        rejectUnauthorized: false // Development self-signed cert bypass
-    };
-
-    const secureSocket = tls.connect(options, () => {
-        console.log('[Backend JS] ✅ TLS Handshake Successful!');
-    });
-
-    let cryptoBuffer = Buffer.alloc(0);
-
-    secureSocket.on('data', (data) => {
-        cryptoBuffer = Buffer.concat([cryptoBuffer, data]);
-
-        if (cryptoBuffer.length >= 30) {
-            const hexKey = cryptoBuffer.subarray(0, 30).toString('hex');
-            console.log(`[Backend JS] 🔐 Key Received (Hex): ${hexKey.substring(0, 10)}...${hexKey.substring(50)}`);
-            secureSocket.end();
-            startVideoPlayer(hexKey);
-        }
-    });
-
-    secureSocket.on('error', (err) => {
-        console.error(`[Backend JS] ❌ TLS Error: ${err.message}`);
-    });
-}
-
-function startVideoPlayer(hexKey) {
-    console.log(`[Backend JS] 🎥 Launching ENCRYPTED Video Feed on UDP ${VIDEO_PORT}...`);
-
-    const srtpCaps = `application/x-srtp,payload=(int)96,ssrc=(uint)112233,srtp-cipher=(string)aes-128-icm,srtp-auth=(string)hmac-sha1-80,srtcp-cipher=(string)aes-128-icm,srtcp-auth=(string)hmac-sha1-80,srtp-key=(buffer)${hexKey}`;
-
-    const gstArgs = [
-        '--gst-debug-level=3', '-v',
-        'udpsrc', `port=${VIDEO_PORT}`,
-        '!', srtpCaps,
-        '!', 'srtpdec',
-        '!', 'rtpjitterbuffer',
-        '!', 'rtph264depay',
-        '!', 'h264parse',
-        '!', 'avdec_h264',
-        '!', 'videoconvert',
-        '!', 'autovideosink', 'sync=false'
-    ];
-
-    const gstProcess = spawn('gst-launch-1.0', gstArgs, { stdio: 'inherit' });
-
-    gstProcess.on('close', (code) => {
-        console.log(`\n[Backend JS] GStreamer exited with code ${code}`);
-        console.log('[Backend JS] Session Ended.');
-    });
-}
-
-startBackend();
+```bash
+node server.js
 
 ```
+
+Open a browser and navigate to `http://localhost:3000`.
 
 ---
 
@@ -466,16 +318,17 @@ All C-API functions are exposed via `#include <ottersec/api.h>` and contained wi
 | `ottersec_send_telemetry(const OtterInferenceResult *result)` | `int` | Serializes telemetry to Protobuf and sends length-prefixed bytes over TCP. |
 | `ottersec_notify_fall(const OtterFallEvent *event)` | `int` | Triggers state transition from `IDLE` to `HANDSHAKING`, spinning up the TLS server on port `8443`. |
 | `ottersec_push_frame(const OtterFrameBuffer *frame)` | `int` | Ingests a raw RGB frame into `appsrc`. Active only during `STREAMING` state. |
+| `ottersec_check_remote_resolve()` | `int` | Thread-safely checks if `OTTER_RESOLVE_CMD` was received and resets the atomic flag. |
 | `ottersec_stop_control_server()` | `void` | Stops the TCP tripwire server independently. |
 | `ottersec_terminate()` | `void` | Stops pipelines, clears key materials via `OPENSSL_cleanse()`, and resets session to `IDLE`. |
 
 ---
 
-## Troubleshooting & Common Operations
+## Troubleshooting
 
-### Port Conflicts / TIME_WAIT Status
+### Stuck Ports / TIME_WAIT
 
-If the C++ process terminates forcefully (`SIGKILL`), the OS kernel may hold TCP 8080 or 8443 in a `TIME_WAIT` state. Clear stuck ports on the edge device:
+If the process exits unexpectedly, the kernel may hold ports `8080` or `8443` in `TIME_WAIT`. Clear them manually:
 
 ```bash
 sudo fuser -k 8080/tcp
@@ -483,9 +336,6 @@ sudo fuser -k 8443/tcp
 
 ```
 
-### Packet Drop Issues
+### Video Smearing or Green Frames
 
-If video freezes or drops during network congestion:
-
-1. Verify `rtpjitterbuffer` is present in the GStreamer command.
-2. Ensure firewall rules permit UDP port 5004 on the backend client (`sudo firewall-cmd --add-port=5004/udp --permanent` on Fedora/RHEL).
+Green artifacting indicates memory race conditions during zero-copy buffer passing. Ensure `push_frame()` allocates an isolated `GstBuffer` memory block via `gst_buffer_new_allocate()` and copies raw frame memory before handing it off to GStreamer.

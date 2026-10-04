@@ -135,6 +135,14 @@ void HandshakeServer::listen_loop() {
     if (client_fd < 0)
       continue;
 
+    struct timeval tv;
+    tv.tv_sec = 2;
+    tv.tv_usec = 0;
+    setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv,
+               sizeof(tv));
+    setsockopt(client_fd, SOL_SOCKET, SO_SNDTIMEO, (const char *)&tv,
+               sizeof(tv));
+
     SSL *ssl = SSL_new(ssl_ctx_);
     SSL_set_fd(ssl, client_fd);
 
@@ -155,6 +163,7 @@ void HandshakeServer::listen_loop() {
 
       // Serialize into a flat 30-byte payload for transmission
       std::vector<uint8_t> payload;
+      payload.reserve(30);
       payload.insert(payload.end(), master_key.begin(), master_key.end());
       payload.insert(payload.end(), master_salt.begin(), master_salt.end());
 
@@ -167,8 +176,7 @@ void HandshakeServer::listen_loop() {
                   << " bytes of key material transmitted securely.\n";
       }
 
-      if (on_complete_)
-        on_complete_(true, master_key, master_salt);
+      OPENSSL_cleanse(payload.data(), payload.size());
 
       if (on_complete_)
         on_complete_(true, master_key, master_salt);

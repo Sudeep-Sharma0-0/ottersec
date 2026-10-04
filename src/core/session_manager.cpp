@@ -88,7 +88,7 @@ void SessionManager::on_handshake_complete(bool success,
     std::cout << "[OtterSec] Handshake Success. Securing keys in memory.\n";
     sec_context_.set_keys(key.data(), key.size(), salt.data(), salt.size());
 
-    std::string target_ip = g_control_server->active_client_ip;
+    std::string target_ip = g_control_server->get_active_ip();
     if (target_ip.empty())
       target_ip = "127.0.0.1";
 
@@ -109,9 +109,11 @@ void SessionManager::on_handshake_complete(bool success,
  * @return false if the system is not in the STREAMING state, or pushing fails.
  */
 bool SessionManager::push_frame(const OtterFrameBuffer *frame) {
-  std::lock_guard<std::mutex> lock(state_mutex_);
-  if (current_state_ != State::STREAMING)
-    return false;
+  {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    if (current_state_ != State::STREAMING)
+      return false;
+  }
 
   return pipeline_.push_frame(frame);
 }
@@ -123,17 +125,22 @@ bool SessionManager::push_frame(const OtterFrameBuffer *frame) {
  * keys from memory, stops the GStreamer pipeline, and resets to IDLE.
  */
 void SessionManager::shutdown() {
-  std::lock_guard<std::mutex> lock(state_mutex_);
+  std::unique_lock<std::mutex> lock(state_mutex_);
   if (current_state_ == State::IDLE)
     return;
 
   transition_to(State::TEARDOWN);
-  if (server_)
-    server_->stop();
+
+  auto srv = std::move(server_);
+
+  lock.unlock();
+
+  if (srv)
+    srv->stop();
+
+  lock.lock();
   sec_context_.clear();
-
   pipeline_.stop();
-
   transition_to(State::IDLE);
 }
 

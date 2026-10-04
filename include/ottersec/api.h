@@ -67,6 +67,11 @@ int ottersec_send_telemetry(const OtterInferenceResult *result);
  */
 void ottersec_stop_control_server(void);
 
+/**
+ * @brief Check the remote client to restart the tripwire.
+ */
+int ottersec_check_remote_resolve(void);
+
 #ifdef __cplusplus
 }
 #endif

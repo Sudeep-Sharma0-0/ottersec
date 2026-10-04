@@ -1,12 +1,12 @@
 /**
  * @file control_server.cpp
- * @brief Implements the Silent Tripwire and Telemetry TCP server.
+ * @brief Implements the Secure TLS Tripwire and Telemetry server.
  *
  * The ControlServer acts as the primary command-and-control channel between
- * the edge device and the backend. It waits for the Python backend to connect,
- * dynamically captures the client's IP address (to route the UDP video later),
- * and streams serialized Protocol Buffer telemetry data (bounding boxes,
- * keypoints, fall events) over a persistent TCP socket.
+ * the edge device and the backend. It waits for the Python backend to connect
+ * over TLS, verifies an inner-tunnel authorization token, dynamically captures
+ * the client's IP address, and streams serialized Protocol Buffer telemetry
+ * data over the encrypted socket.
  */
 #include "control_server.hpp"
 
@@ -19,31 +19,58 @@
 namespace ottersec {
 
 /**
- * @brief Constructs a new ControlServer.
+ * @brief Constructs a new ControlServer with TLS certificates.
  *
- * @param port The TCP port to listen on for incoming control connections
- * (default 8080).
+ * @param port The TCP port to listen on.
+ * @param cert_path Path to the public TLS certificate.
+ * @param key_path Path to the private TLS key.
  */
-ControlServer::ControlServer(int port)
-    : port_(port), server_fd_(-1), client_fd_(-1), running_(false) {}
+ControlServer::ControlServer(int port, const std::string &cert_path,
+                             const std::string &key_path)
+    : port_(port), cert_path_(cert_path), key_path_(key_path) {
+  ssl_ctx_ = create_ssl_context();
+}
 
 /**
  * @brief Destroys the ControlServer, ensuring all sockets and threads are
  * safely closed.
  */
-ControlServer::~ControlServer() { stop(); }
+ControlServer::~ControlServer() {
+  stop();
+  if (ssl_ctx_) {
+    SSL_CTX_free(ssl_ctx_);
+  }
+}
+
+/**
+ * @brief Initializes OpenSSL context and loads certificates.
+ */
+SSL_CTX *ControlServer::create_ssl_context() {
+  const SSL_METHOD *method = TLS_server_method();
+  SSL_CTX *ctx = SSL_CTX_new(method);
+  if (!ctx)
+    return nullptr;
+
+  if (SSL_CTX_use_certificate_file(ctx, cert_path_.c_str(), SSL_FILETYPE_PEM) <=
+          0 ||
+      SSL_CTX_use_PrivateKey_file(ctx, key_path_.c_str(), SSL_FILETYPE_PEM) <=
+          0) {
+    std::cerr << "[OtterSec Control] Failed to load TLS certificates for port "
+              << port_ << "\n";
+    SSL_CTX_free(ctx);
+    return nullptr;
+  }
+  return ctx;
+}
 
 /**
  * @brief Initializes the TCP socket, binds to the port, and starts the listener
  * thread.
- *
- * Enables SO_REUSEADDR to prevent "Address already in use" errors during rapid
- * restarts. Spawns an asynchronous thread running `accept_loop`.
- *
- * @return true if the socket successfully binds and the listener thread starts.
- * @return false if socket creation, binding, or listening fails.
  */
 bool ControlServer::start() {
+  if (!ssl_ctx_)
+    return false;
+
   server_fd_ = socket(AF_INET, SOCK_STREAM, 0);
   if (server_fd_ < 0) {
     std::cerr << "[OtterSec Control] Failed to create socket.\n";
@@ -72,17 +99,14 @@ bool ControlServer::start() {
 
   running_ = true;
   server_thread_ = std::thread(&ControlServer::accept_loop, this);
-  std::cout << "[OtterSec Control] Listening on port " << port_ << "...\n";
+  std::cout << "[OtterSec Control] TLS Telemetry Server listening on port "
+            << port_ << "...\n";
 
   return true;
 }
 
 /**
- * @brief Safely shuts down the server.
- *
- * Closes the active client connection, shuts down the main listening socket,
- * and joins the `accept_loop` thread back to the main process to prevent
- * segmentation faults.
+ * @brief Safely shuts down the server and clears OpenSSL resources.
  */
 void ControlServer::stop() {
   running_ = false;
@@ -91,9 +115,17 @@ void ControlServer::stop() {
     close(server_fd_);
     server_fd_ = -1;
   }
-  if (client_fd_ >= 0) {
-    close(client_fd_);
-    client_fd_ = -1;
+  {
+    std::lock_guard<std::mutex> lock(send_mutex_);
+    if (active_ssl_) {
+      SSL_shutdown(active_ssl_);
+      SSL_free(active_ssl_);
+      active_ssl_ = nullptr;
+    }
+    if (client_fd_ >= 0) {
+      close(client_fd_);
+      client_fd_ = -1;
+    }
   }
   if (server_thread_.joinable()) {
     server_thread_.join();
@@ -101,65 +133,110 @@ void ControlServer::stop() {
 }
 
 /**
- * @brief Background thread loop that accepts incoming client connections.
- *
- * Upon a successful connection, it extracts the client's IPv4 address using
- * inet_ntop and stores it in `active_client_ip`. This dynamic discovery is
- * critical for allowing the SessionManager to know where to shoot the UDP
- * video.
+ * @brief Background thread loop that accepts connections and enforces TLS +
+ * Token Auth.
  */
 void ControlServer::accept_loop() {
   while (running_) {
     sockaddr_in client_addr{};
     socklen_t client_len = sizeof(client_addr);
 
-    int new_client_fd =
+    int new_fd =
         accept(server_fd_, (struct sockaddr *)&client_addr, &client_len);
+    if (new_fd < 0)
+      continue;
 
-    if (new_client_fd >= 0) {
-      char ip_str[INET_ADDRSTRLEN];
-      inet_ntop(AF_INET, &client_addr.sin_addr, ip_str, INET_ADDRSTRLEN);
+    SSL *ssl = SSL_new(ssl_ctx_);
+    SSL_set_fd(ssl, new_fd);
 
-      this->active_client_ip = std::string(ip_str);
-
-      std::cout << "[OtterSec Control] Dynamic IP Discovery Success!\n";
-      std::cout << "[OtterSec Control] Python backend connected from: "
-                << this->active_client_ip << "\n";
-
-      this->client_fd_ = new_client_fd;
+    if (SSL_accept(ssl) <= 0) {
+      std::cerr
+          << "[OtterSec Control] TLS Handshake failed. Dropping connection.\n";
+      SSL_free(ssl);
+      close(new_fd);
+      continue;
     }
+
+    struct timeval tv;
+    tv.tv_sec = 2;
+    tv.tv_usec = 0;
+    setsockopt(new_fd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof(tv));
+
+    char auth_buf[32] = {0};
+    int bytes = SSL_read(ssl, auth_buf, 17);
+
+    const std::string EXPECTED_TOKEN = "OTTER_ADMIN_TOKEN";
+    const std::string RESOLVE_TOKEN = "OTTER_RESOLVE_CMD";
+
+    if (bytes == RESOLVE_TOKEN.length() &&
+        memcmp(auth_buf, RESOLVE_TOKEN.data(), bytes) == 0) {
+      std::cout
+          << "\n[OtterSec] Received REMOTE RESOLVE Command from Backend!\n";
+      remote_resolve_triggered = true;
+      SSL_shutdown(ssl);
+      SSL_free(ssl);
+      close(new_fd);
+      continue;
+    }
+
+    if (bytes != EXPECTED_TOKEN.length() ||
+        memcmp(auth_buf, EXPECTED_TOKEN.data(), bytes) != 0) {
+      std::cerr << "[OtterSec Control] Unauthorized client failed token "
+                   "verification. Dropping.\n";
+      SSL_shutdown(ssl);
+      SSL_free(ssl);
+      close(new_fd);
+      continue;
+    }
+
+    tv.tv_sec = 0;
+    setsockopt(new_fd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof(tv));
+
+    char ip_str[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &client_addr.sin_addr, ip_str, INET_ADDRSTRLEN);
+
+    std::lock_guard<std::mutex> lock(send_mutex_);
+    if (active_ssl_) {
+      SSL_shutdown(active_ssl_);
+      SSL_free(active_ssl_);
+      close(client_fd_);
+    }
+
+    this->active_client_ip = std::string(ip_str);
+    this->client_fd_ = new_fd;
+    this->active_ssl_ = ssl;
+
+    std::cout << "[OtterSec Control] TLS Client Verified & Connected from: "
+              << this->active_client_ip << "\n";
   }
 }
 
 /**
- * @brief Transmits a length-prefixed raw binary payload to the connected
- * client.
- *
- * Uses a standard network framing protocol: it first sends a 4-byte header
- * (converted to network byte order via `htonl`) indicating the exact size
- * of the payload, followed by the payload itself. Uses MSG_NOSIGNAL to
- * prevent the application from crashing via SIGPIPE if the client disconnects.
- *
- * @param data Pointer to the serialized Protobuf byte array.
- * @param size The total number of bytes in the payload.
+ * @brief Transmits a length-prefixed raw binary payload over TLS.
  */
 void ControlServer::send_raw_payload(const uint8_t *data, size_t size) {
-  if (client_fd_ < 0 || !data || size == 0)
+  std::lock_guard<std::mutex> lock(send_mutex_);
+  if (!active_ssl_ || !data || size == 0)
     return;
 
-  std::lock_guard<std::mutex> lock(send_mutex_);
-
-  // Send 4-byte length prefix (Network Byte Order)
   uint32_t net_length = htonl(static_cast<uint32_t>(size));
-  if (send(client_fd_, &net_length, sizeof(net_length), MSG_NOSIGNAL) < 0) {
+
+  // Send 4-byte length prefix
+  if (SSL_write(active_ssl_, &net_length, sizeof(net_length)) <= 0) {
+    SSL_free(active_ssl_);
+    active_ssl_ = nullptr;
     close(client_fd_);
     client_fd_ = -1;
     return;
   }
 
-  if (send(client_fd_, data, size, MSG_NOSIGNAL) < 0) {
+  // Send Protobuf payload
+  if (SSL_write(active_ssl_, data, size) <= 0) {
+    SSL_free(active_ssl_);
+    active_ssl_ = nullptr;
     close(client_fd_);
     client_fd_ = -1;
   }
 }
+
 } // namespace ottersec
