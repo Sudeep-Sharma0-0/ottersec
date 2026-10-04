@@ -85,9 +85,9 @@ $(function() {
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a09b1fd0ea3e62eaabf4db88723f108b4" id="r_a09b1fd0ea3e62eaabf4db88723f108b4"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classottersec_1_1ControlServer.html#a09b1fd0ea3e62eaabf4db88723f108b4">ControlServer</a> (int port=8080)</td></tr>
-<tr class="memdesc:a09b1fd0ea3e62eaabf4db88723f108b4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructs a new <a class="el" href="classottersec_1_1ControlServer.html">ControlServer</a>.  <br /></td></tr>
-<tr class="separator:a09b1fd0ea3e62eaabf4db88723f108b4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a89b561ca6ca18beecfd4cee32384df96" id="r_a89b561ca6ca18beecfd4cee32384df96"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classottersec_1_1ControlServer.html#a89b561ca6ca18beecfd4cee32384df96">ControlServer</a> (int port, const std::string &amp;cert_path, const std::string &amp;key_path)</td></tr>
+<tr class="memdesc:a89b561ca6ca18beecfd4cee32384df96"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructs a new <a class="el" href="classottersec_1_1ControlServer.html">ControlServer</a> with TLS certificates.  <br /></td></tr>
+<tr class="separator:a89b561ca6ca18beecfd4cee32384df96"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a45f1ed70db21bd12a5ff2ef9d35d91cd" id="r_a45f1ed70db21bd12a5ff2ef9d35d91cd"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classottersec_1_1ControlServer.html#a45f1ed70db21bd12a5ff2ef9d35d91cd">~ControlServer</a> ()</td></tr>
 <tr class="memdesc:a45f1ed70db21bd12a5ff2ef9d35d91cd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Destroys the <a class="el" href="classottersec_1_1ControlServer.html">ControlServer</a>, ensuring all sockets and threads are safely closed.  <br /></td></tr>
 <tr class="separator:a45f1ed70db21bd12a5ff2ef9d35d91cd"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -95,20 +95,24 @@ Public Member Functions</h2></td></tr>
 <tr class="memdesc:a1db0a47ee13c8a256fd80792daaf0dd5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Initializes the TCP socket, binds to the port, and starts the listener thread.  <br /></td></tr>
 <tr class="separator:a1db0a47ee13c8a256fd80792daaf0dd5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2d2116576fed4ccc26ab58dcae938d3a" id="r_a2d2116576fed4ccc26ab58dcae938d3a"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classottersec_1_1ControlServer.html#a2d2116576fed4ccc26ab58dcae938d3a">stop</a> ()</td></tr>
-<tr class="memdesc:a2d2116576fed4ccc26ab58dcae938d3a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Safely shuts down the server.  <br /></td></tr>
+<tr class="memdesc:a2d2116576fed4ccc26ab58dcae938d3a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Safely shuts down the server and clears OpenSSL resources.  <br /></td></tr>
 <tr class="separator:a2d2116576fed4ccc26ab58dcae938d3a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab3883dd172c0a03a5a90bac2af8c79b2" id="r_ab3883dd172c0a03a5a90bac2af8c79b2"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classottersec_1_1ControlServer.html#ab3883dd172c0a03a5a90bac2af8c79b2">send_raw_payload</a> (const uint8_t *data, size_t size)</td></tr>
-<tr class="memdesc:ab3883dd172c0a03a5a90bac2af8c79b2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transmits a length-prefixed raw binary payload to the connected client.  <br /></td></tr>
+<tr class="memdesc:ab3883dd172c0a03a5a90bac2af8c79b2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transmits a length-prefixed raw binary payload over TLS.  <br /></td></tr>
 <tr class="separator:ab3883dd172c0a03a5a90bac2af8c79b2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aaa287823fc39f26ead094afae768005a" id="r_aaa287823fc39f26ead094afae768005a"><td class="memItemLeft" align="right" valign="top">std::string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classottersec_1_1ControlServer.html#aaa287823fc39f26ead094afae768005a">get_active_ip</a> ()</td></tr>
+<tr class="separator:aaa287823fc39f26ead094afae768005a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
 Data Fields</h2></td></tr>
-<tr class="memitem:afc005a9c8e1b2c3e8f6f8cd3f3423535" id="r_afc005a9c8e1b2c3e8f6f8cd3f3423535"><td class="memItemLeft" align="right" valign="top">std::string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classottersec_1_1ControlServer.html#afc005a9c8e1b2c3e8f6f8cd3f3423535">active_client_ip</a> = &quot;&quot;</td></tr>
+<tr class="memitem:afc005a9c8e1b2c3e8f6f8cd3f3423535" id="r_afc005a9c8e1b2c3e8f6f8cd3f3423535"><td class="memItemLeft" align="right" valign="top">std::string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classottersec_1_1ControlServer.html#afc005a9c8e1b2c3e8f6f8cd3f3423535">active_client_ip</a></td></tr>
 <tr class="separator:afc005a9c8e1b2c3e8f6f8cd3f3423535"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae72141f5ccebf521fad77fd0e7efdfcd" id="r_ae72141f5ccebf521fad77fd0e7efdfcd"><td class="memItemLeft" align="right" valign="top">std::atomic&lt; bool &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classottersec_1_1ControlServer.html#ae72141f5ccebf521fad77fd0e7efdfcd">remote_resolve_triggered</a> {false}</td></tr>
+<tr class="separator:ae72141f5ccebf521fad77fd0e7efdfcd"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
-<a id="a09b1fd0ea3e62eaabf4db88723f108b4" name="a09b1fd0ea3e62eaabf4db88723f108b4"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a09b1fd0ea3e62eaabf4db88723f108b4">&#9670;&#160;</a></span>ControlServer()</h2>
+<a id="a89b561ca6ca18beecfd4cee32384df96" name="a89b561ca6ca18beecfd4cee32384df96"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a89b561ca6ca18beecfd4cee32384df96">&#9670;&#160;</a></span>ControlServer()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -117,16 +121,34 @@ Data Fields</h2></td></tr>
           <td class="memname">ottersec::ControlServer::ControlServer </td>
           <td>(</td>
           <td class="paramtype">int&#160;</td>
-          <td class="paramname"><em>port</em> = <code>8080</code></td><td>)</td>
+          <td class="paramname"><em>port</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
           <td></td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
+          <td class="paramname"><em>cert_path</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
+          <td class="paramname"><em>key_path</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
         </tr>
       </table>
 </div><div class="memdoc">
 
-<p>Constructs a new <a class="el" href="classottersec_1_1ControlServer.html">ControlServer</a>. </p>
+<p>Constructs a new <a class="el" href="classottersec_1_1ControlServer.html">ControlServer</a> with TLS certificates. </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">port</td><td>The TCP port to listen on for incoming control connections (default 8080). </td></tr>
+    <tr><td class="paramname">port</td><td>The TCP port to listen on. </td></tr>
+    <tr><td class="paramname">cert_path</td><td>Path to the public TLS certificate. </td></tr>
+    <tr><td class="paramname">key_path</td><td>Path to the private TLS key. </td></tr>
   </table>
   </dd>
 </dl>
@@ -153,6 +175,31 @@ Data Fields</h2></td></tr>
 </div>
 </div>
 <h2 class="groupheader">Member Function Documentation</h2>
+<a id="aaa287823fc39f26ead094afae768005a" name="aaa287823fc39f26ead094afae768005a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aaa287823fc39f26ead094afae768005a">&#9670;&#160;</a></span>get_active_ip()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::string ottersec::ControlServer::get_active_ip </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
 <a id="ab3883dd172c0a03a5a90bac2af8c79b2" name="ab3883dd172c0a03a5a90bac2af8c79b2"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ab3883dd172c0a03a5a90bac2af8c79b2">&#9670;&#160;</a></span>send_raw_payload()</h2>
 
@@ -179,15 +226,7 @@ Data Fields</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p>Transmits a length-prefixed raw binary payload to the connected client. </p>
-<p>Uses a standard network framing protocol: it first sends a 4-byte header (converted to network byte order via <code>htonl</code>) indicating the exact size of the payload, followed by the payload itself. Uses MSG_NOSIGNAL to prevent the application from crashing via SIGPIPE if the client disconnects.</p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">data</td><td>Pointer to the serialized Protobuf byte array. </td></tr>
-    <tr><td class="paramname">size</td><td>The total number of bytes in the payload. </td></tr>
-  </table>
-  </dd>
-</dl>
+<p>Transmits a length-prefixed raw binary payload over TLS. </p>
 
 </div>
 </div>
@@ -207,10 +246,6 @@ Data Fields</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Initializes the TCP socket, binds to the port, and starts the listener thread. </p>
-<p>Enables SO_REUSEADDR to prevent "Address already in use" errors during rapid restarts. Spawns an asynchronous thread running <code>accept_loop</code>.</p>
-<dl class="section return"><dt>Returns</dt><dd>true if the socket successfully binds and the listener thread starts. </dd>
-<dd>
-false if socket creation, binding, or listening fails. </dd></dl>
 
 </div>
 </div>
@@ -229,8 +264,7 @@ false if socket creation, binding, or listening fails. </dd></dl>
       </table>
 </div><div class="memdoc">
 
-<p>Safely shuts down the server. </p>
-<p>Closes the active client connection, shuts down the main listening socket, and joins the <code>accept_loop</code> thread back to the main process to prevent segmentation faults. </p>
+<p>Safely shuts down the server and clears OpenSSL resources. </p>
 
 </div>
 </div>
@@ -242,7 +276,21 @@ false if socket creation, binding, or listening fails. </dd></dl>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">std::string ottersec::ControlServer::active_client_ip = &quot;&quot;</td>
+          <td class="memname">std::string ottersec::ControlServer::active_client_ip</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="ae72141f5ccebf521fad77fd0e7efdfcd" name="ae72141f5ccebf521fad77fd0e7efdfcd"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae72141f5ccebf521fad77fd0e7efdfcd">&#9670;&#160;</a></span>remote_resolve_triggered</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::atomic&lt;bool&gt; ottersec::ControlServer::remote_resolve_triggered {false}</td>
         </tr>
       </table>
 </div><div class="memdoc">

@@ -8,7 +8,7 @@ digraph "src/core/control_server.hpp"
   Node1 -> Node2 [id="edge1_Node000001_Node000002",dir="back",color="steelblue1",style="solid",tooltip=" "];
   Node2 [id="Node000002",label="src/api.cpp",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$api_8cpp.html",tooltip="C-API implementation for the OtterSec Edge-to-Server middleware."];
   Node1 -> Node3 [id="edge2_Node000001_Node000003",dir="back",color="steelblue1",style="solid",tooltip=" "];
-  Node3 [id="Node000003",label="src/core/control_server.cpp",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$control__server_8cpp.html",tooltip="Implements the Silent Tripwire and Telemetry TCP server."];
+  Node3 [id="Node000003",label="src/core/control_server.cpp",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$control__server_8cpp.html",tooltip="Implements the Secure TLS Tripwire and Telemetry server."];
   Node1 -> Node4 [id="edge3_Node000001_Node000004",dir="back",color="steelblue1",style="solid",tooltip=" "];
   Node4 [id="Node000004",label="src/core/session_manager.cpp",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$session__manager_8cpp.html",tooltip="Orchestrates the high-level state machine for OtterSec secure streaming."];
 }

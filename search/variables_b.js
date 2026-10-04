@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['surface_5fptr_0',['surface_ptr',['../structOtterFrameBuffer.html#a2fd4cd1b44925c6c97ae60884baaf585',1,'OtterFrameBuffer']]]
+  ['remote_5fresolve_5ftriggered_0',['remote_resolve_triggered',['../classottersec_1_1ControlServer.html#ae72141f5ccebf521fad77fd0e7efdfcd',1,'ottersec::ControlServer']]]
 ];

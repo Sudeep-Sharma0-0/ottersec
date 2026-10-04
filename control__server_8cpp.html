@@ -80,7 +80,7 @@ $(function() {
 </div><!--header-->
 <div class="contents">
 
-<p>Implements the Silent Tripwire and Telemetry TCP server.  
+<p>Implements the Secure TLS Tripwire and Telemetry server.  
 <a href="#details">More...</a></p>
 <div class="textblock"><code>#include &quot;<a class="el" href="control__server_8hpp_source.html">control_server.hpp</a>&quot;</code><br />
 <code>#include &lt;arpa/inet.h&gt;</code><br />
@@ -100,8 +100,8 @@ Namespaces</h2></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
-<div class="textblock"><p>Implements the Silent Tripwire and Telemetry TCP server. </p>
-<p>The ControlServer acts as the primary command-and-control channel between the edge device and the backend. It waits for the Python backend to connect, dynamically captures the client's IP address (to route the UDP video later), and streams serialized Protocol Buffer telemetry data (bounding boxes, keypoints, fall events) over a persistent TCP socket. </p>
+<div class="textblock"><p>Implements the Secure TLS Tripwire and Telemetry server. </p>
+<p>The ControlServer acts as the primary command-and-control channel between the edge device and the backend. It waits for the Python backend to connect over TLS, verifies an inner-tunnel authorization token, dynamically captures the client's IP address, and streams serialized Protocol Buffer telemetry data over the encrypted socket. </p>
 </div></div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>

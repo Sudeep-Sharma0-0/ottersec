@@ -54,8 +54,12 @@ digraph "src/core/session_manager.cpp"
   Node21 -> Node13 [id="edge27_Node000021_Node000013",color="steelblue1",style="solid",tooltip=" "];
   Node21 -> Node14 [id="edge28_Node000021_Node000014",color="steelblue1",style="solid",tooltip=" "];
   Node21 -> Node20 [id="edge29_Node000021_Node000020",color="steelblue1",style="solid",tooltip=" "];
-  Node21 -> Node10 [id="edge30_Node000021_Node000010",color="steelblue1",style="solid",tooltip=" "];
-  Node21 -> Node16 [id="edge31_Node000021_Node000016",color="steelblue1",style="solid",tooltip=" "];
-  Node1 -> Node22 [id="edge32_Node000001_Node000022",color="steelblue1",style="solid",tooltip=" "];
-  Node22 [id="Node000022",label="iostream",height=0.2,width=0.4,color="grey60", fillcolor="#E0E0E0", style="filled",tooltip=" "];
+  Node21 -> Node22 [id="edge30_Node000021_Node000022",color="steelblue1",style="solid",tooltip=" "];
+  Node22 [id="Node000022",label="openssl/err.h",height=0.2,width=0.4,color="grey60", fillcolor="#E0E0E0", style="filled",tooltip=" "];
+  Node21 -> Node23 [id="edge31_Node000021_Node000023",color="steelblue1",style="solid",tooltip=" "];
+  Node23 [id="Node000023",label="openssl/ssl.h",height=0.2,width=0.4,color="grey60", fillcolor="#E0E0E0", style="filled",tooltip=" "];
+  Node21 -> Node10 [id="edge32_Node000021_Node000010",color="steelblue1",style="solid",tooltip=" "];
+  Node21 -> Node16 [id="edge33_Node000021_Node000016",color="steelblue1",style="solid",tooltip=" "];
+  Node1 -> Node24 [id="edge34_Node000001_Node000024",color="steelblue1",style="solid",tooltip=" "];
+  Node24 [id="Node000024",label="iostream",height=0.2,width=0.4,color="grey60", fillcolor="#E0E0E0", style="filled",tooltip=" "];
 }
